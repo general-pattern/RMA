@@ -54,29 +54,33 @@ STATUS_OPTIONS = ['Draft', 'Acknowledged', 'In Progress', 'Rejected', 'Closed']
 
 def init_db_if_needed():
     """
-    Ensure the SQLite DB exists, create tables from schema.sql if needed,
-    and seed a default admin user if the users table is empty.
+    Ensure all tables from schema.sql exist, and seed a default admin user
+    if the users table is empty.
     """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    # 1) Check if 'users' table exists
+    # 1) Always run schema.sql – CREATE TABLE IF NOT EXISTS is safe to re-run
+    schema_path = os.path.join(BASE_DIR, "schema.sql")
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema_sql = f.read()
+
+    conn.executescript(schema_sql)
+    conn.commit()
+    print("✅ Ensured all tables exist from schema.sql")
+
+    # 2) Make sure 'users' table exists and see how many users we have
     cur.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='users';"
     )
     users_table_exists = cur.fetchone() is not None
 
     if not users_table_exists:
-        # Run schema.sql to create all tables
-        schema_path = os.path.join(BASE_DIR, "schema.sql")
-        with open(schema_path, "r", encoding="utf-8") as f:
-            schema_sql = f.read()
+        # Something's wrong with schema.sql – bail out loudly
+        print("⚠️ 'users' table not found even after applying schema.sql")
+        conn.close()
+        return
 
-        conn.executescript(schema_sql)
-        conn.commit()
-        print("✅ Created tables from schema.sql")
-
-    # 2) Check how many users exist
     cur.execute("SELECT COUNT(*) FROM users")
     user_count = cur.fetchone()[0]
 
