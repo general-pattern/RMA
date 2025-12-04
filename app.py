@@ -20,7 +20,7 @@ else:
     # Running as normal Python script
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-DB_PATH = "rma.db"
+DB_PATH = os.path.join(BASE_DIR, "rma.db")
 
 app = Flask(
     __name__,
@@ -30,6 +30,7 @@ app = Flask(
 
 # Use env var in production, fallback for dev
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -52,29 +53,58 @@ EMAIL_CONFIG = {
 STATUS_OPTIONS = ['Draft', 'Acknowledged', 'In Progress', 'Rejected', 'Closed']
 
 def init_db_if_needed():
-    """Create the database tables on Render if they don't exist yet."""
-    # 1) Check if the 'users' table exists
+    """
+    Ensure the SQLite DB exists, create tables from schema.sql if needed,
+    and seed a default admin user if the users table is empty.
+    """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
+
+    # 1) Check if 'users' table exists
     cur.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='users';"
     )
-    exists = cur.fetchone() is not None
+    users_table_exists = cur.fetchone() is not None
+
+    if not users_table_exists:
+        # Run schema.sql to create all tables
+        schema_path = os.path.join(BASE_DIR, "schema.sql")
+        with open(schema_path, "r", encoding="utf-8") as f:
+            schema_sql = f.read()
+
+        conn.executescript(schema_sql)
+        conn.commit()
+        print("✅ Created tables from schema.sql")
+
+    # 2) Check how many users exist
+    cur.execute("SELECT COUNT(*) FROM users")
+    user_count = cur.fetchone()[0]
+
+    if user_count == 0:
+        # Seed a default admin user
+        username = "admin"
+        raw_password = "Admin123!"  # change after first login
+        password_hash = generate_password_hash(raw_password)
+
+        full_name = "Admin User"
+        email = "admin@example.com"
+        role = "admin"
+        created_on = datetime.utcnow().isoformat(timespec="seconds")
+        last_login = None  # or created_on if you prefer
+
+        cur.execute(
+            """
+            INSERT INTO users (Username, PasswordHash, FullName, Email, Role, CreatedOn, LastLogin)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (username, password_hash, full_name, email, role, created_on, last_login),
+        )
+
+        conn.commit()
+        print("✅ Seeded default admin user: admin / Admin123!")
+
     conn.close()
 
-    if exists:
-        return  # DB already initialized
-
-    # 2) If not, run schema.sql to create all tables
-    schema_path = os.path.join(BASE_DIR, "schema.sql")
-    with open(schema_path, "r", encoding="utf-8") as f:
-        schema_sql = f.read()
-
-    conn = sqlite3.connect(DB_PATH)
-    conn.executescript(schema_sql)
-    conn.commit()
-    conn.close()
-    print("✅ Database initialized from schema.sql (users table created).")
 
 def init_sqlite():
     conn = sqlite3.connect(DB_PATH)
