@@ -49,8 +49,8 @@
             <a href="{{ url_for('list_owners') }}">👤 Internal Owners</a>
           </div>
         </div>
-        
-        <!-- User Menu -->
+       
+              <!-- User Menu / Auth Links -->
         {% if current_user %}
         <div class="nav-dropdown user-menu">
           <button class="nav-dropdown-btn user-btn">
@@ -64,7 +64,14 @@
             <a href="{{ url_for('logout') }}" class="logout-link">🚪 Logout</a>
           </div>
         </div>
+        {% elif session.get('user_id') %}
+          {# Fallback: session says logged in, but current_user is None #}
+          <a href="{{ url_for('logout') }}" class="nav-link">🚪 Logout</a>
+        {% else %}
+          {# Not logged in at all #}
+          <a href="{{ url_for('login') }}" class="nav-link">🔐 Login</a>
         {% endif %}
+
       </nav>
     </header>
 
