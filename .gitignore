@@ -1,0 +1,18 @@
+# Databases
+*.db
+*.sqlite
+*.accdb
+*.mdb
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Env / secrets
+.env
+*.env
+
+# Uploads or temp
+uploads/
+tmp/
