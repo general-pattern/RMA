@@ -16,3 +16,27 @@ venv/
 # Uploads or temp
 uploads/
 tmp/
+
+# Python / env
+__pycache__/
+*.pyc
+venv/
+
+# Databases (don't commit actual DB files)
+*.db
+*.sqlite
+*.accdb
+*.mdb
+
+# Backups
+*.backup
+
+# Build / dist artifacts
+build/
+dist/
+*.spec
+
+# Logs & temp
+*.log
+tmp/
+uploads/
