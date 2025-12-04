@@ -47,11 +47,34 @@ EMAIL_CONFIG = {
     "base_url": "http://127.0.0.1:5000",
 }
 
-
-
 # Status flow options
 # Canonical statuses for the whole app
 STATUS_OPTIONS = ['Draft', 'Acknowledged', 'In Progress', 'Rejected', 'Closed']
+
+def init_db_if_needed():
+    """Create the database tables on Render if they don't exist yet."""
+    # 1) Check if the 'users' table exists
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='users';"
+    )
+    exists = cur.fetchone() is not None
+    conn.close()
+
+    if exists:
+        return  # DB already initialized
+
+    # 2) If not, run schema.sql to create all tables
+    schema_path = os.path.join(BASE_DIR, "schema.sql")
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema_sql = f.read()
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.executescript(schema_sql)
+    conn.commit()
+    conn.close()
+    print("✅ Database initialized from schema.sql (users table created).")
 
 def init_sqlite():
     conn = sqlite3.connect(DB_PATH)
@@ -2528,7 +2551,10 @@ def inject_user():
 
 
 if __name__ == "__main__":
+    # Make sure the DB/tables exist before we start serving
+    init_db_if_needed()
     app.run(host="0.0.0.0", port=10000, debug=False)
+
 
 
 
