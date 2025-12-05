@@ -636,16 +636,17 @@ def metrics():
     top_customers = cur.fetchall()
     
     # Owner workload
-    cur.execute(f"""
-        SELECT o.FullName, 
-               COUNT(r.RMAID) as total,
-               SUM(CASE WHEN r.Status NOT IN ('Closed', 'Rejected') THEN 1 ELSE 0 END) as active
-        FROM users WHERE IsOwner = 1 o
-        LEFT JOIN rmas r ON o.UserID = r.AssignedToUserID AND (1=1 {date_filter.replace('r.DateOpened', 'DateOpened') if date_filter else ''})
-        GROUP BY o.UserID
-        ORDER BY active DESC, total DESC
-    """)
-    owner_workload = cur.fetchall()
+cur.execute(f"""
+    SELECT o.FullName AS OwnerName, 
+           COUNT(r.RMAID) as total,
+           SUM(CASE WHEN r.Status NOT IN ('Closed', 'Rejected') THEN 1 ELSE 0 END) as active
+    FROM users o
+    LEFT JOIN rmas r ON o.UserID = r.AssignedToUserID AND (1=1 {date_filter.replace('r.DateOpened', 'DateOpened') if date_filter else ''})
+    WHERE o.IsOwner = 1
+    GROUP BY o.UserID
+    ORDER BY active DESC, total DESC
+""")
+owner_workload = cur.fetchall()
     
     # Disposition breakdown
     cur.execute(f"""
