@@ -43,18 +43,6 @@ body {
   --shadow-lg: 0 4px 6px rgba(0,0,0,0.1);
 }
 
-/* Fix layout */
-body {
-  margin: 0;
-  padding: 0;
-}
-
-.app-shell {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 20px 40px;
-}
-
 .app-header {
   background: white;
   position: sticky;
