@@ -409,3 +409,99 @@ textarea { resize: vertical; min-height: 80px; }
 .stat-draft { border-left-color: #6b7280; }
 .stat-urgent { border-left-color: #dc2626; }
 .stat-rejected { border-left-color: #6b7280; }
+
+/* ---------- RMA list: compact filter row ---------- */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--primary, #2563eb);
+  color: #fff;
+  border: none;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* Filter card becomes a horizontal bar */
+.filter-card {
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.filter-form {
+  width: 100%;
+}
+
+.filter-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+/* Each single filter */
+.filter-group {
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Make the search box wider */
+.filter-group:first-child {
+  flex: 2 1 260px;
+}
+
+.filter-group input,
+.filter-group select {
+  height: 34px;
+  font-size: 0.9rem;
+}
+
+/* Push the Search/Clear buttons to the far right */
+.filter-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* On smaller screens, let it wrap nicely */
+@media (max-width: 900px) {
+  .filter-actions {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+}
