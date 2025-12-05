@@ -306,7 +306,7 @@ def login():
         session["user_id"] = user["UserID"]
         session["username"] = user["Username"]
         session["role"] = user["Role"]
-	session["full_name"] = user["FullName"]
+        session["full_name"] = user["FullName"]
 
         # optional: update LastLogin
         conn = sqlite3.connect(DB_PATH)
