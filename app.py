@@ -706,7 +706,6 @@ def metrics():
     )
 
 
-
 # ============ RMA LIST & SEARCH ============
 @app.route("/rmas")
 @login_required
@@ -722,40 +721,55 @@ def list_rmas():
     disposition_status = request.args.get("disposition_status")
 
     conn = get_db()
+    conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     
-    # Dropdown data
+    # ---------- Dropdown data ----------
     cur.execute("SELECT * FROM customers ORDER BY CustomerName")
     customers = cur.fetchall()
     
+    # Owners now come from users (no separate internal_owners table)
     cur.execute("""
-    SELECT UserID AS OwnerID,
-           FullName AS OwnerName,
-           Email
-    FROM users
-    WHERE Role != 'admin'          -- or whatever filter you want
-    ORDER BY FullName
-""")
-owners = cur.fetchall()
+        SELECT 
+            UserID  AS OwnerID,
+            FullName AS OwnerName,
+            Email
+        FROM users
+        WHERE Role != 'admin'
+        ORDER BY FullName
+    """)
+    owners = cur.fetchall()
 
-
-    # Base query - now includes disposition check
+    # ---------- Base query (includes has_disposition) ----------
     query = """
-        SELECT r.*, c.CustomerName, o.OwnerName, u.FullName as CreatedByName,
-               CASE WHEN EXISTS (
-                   SELECT 1 FROM rma_lines l
-                   JOIN dispositions d ON l.RMALineID = d.RMALineID
-                   WHERE l.RMAID = r.RMAID AND d.Disposition IS NOT NULL
-               ) THEN 1 ELSE 0 END as has_disposition
+        SELECT
+            r.*,
+            c.CustomerName,
+            o.FullName AS OwnerName,
+            o.Email    AS OwnerEmail,
+            u.FullName AS CreatedByName,
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1 
+                    FROM rma_lines l
+                    JOIN dispositions d ON l.RMALineID = d.RMALineID
+                    WHERE l.RMAID = r.RMAID
+                      AND d.Disposition IS NOT NULL
+                ) THEN 1 
+                ELSE 0 
+            END AS has_disposition
         FROM rmas r
-        JOIN customers c ON r.CustomerID = c.CustomerID
-        LEFT JOIN internal_owners o ON r.InternalOwnerID = o.OwnerID
-        LEFT JOIN users u ON r.CreatedByUserID = u.UserID
-        WHERE 1=1
+        JOIN customers c
+            ON r.CustomerID = c.CustomerID
+        LEFT JOIN users o
+            ON r.InternalOwnerID = o.UserID
+        LEFT JOIN users u
+            ON r.CreatedByUserID = u.UserID
+        WHERE 1 = 1
     """
     params = []
     
-    # Filters
+    # ---------- Filters ----------
     if status:
         query += " AND r.Status = ?"
         params.append(status)
@@ -786,35 +800,45 @@ owners = cur.fetchall()
         params.append(credit_approved)
     
     # Disposition status filter
-    if disposition_status == 'completed':
-        query += """ AND EXISTS (
-            SELECT 1 FROM rma_lines l
-            JOIN dispositions d ON l.RMALineID = d.RMALineID
-            WHERE l.RMAID = r.RMAID AND d.Disposition IS NOT NULL
-        )"""
-    elif disposition_status == 'pending':
-        query += """ AND EXISTS (
-            SELECT 1 FROM rma_lines l
-            WHERE l.RMAID = r.RMAID
-        ) AND NOT EXISTS (
-            SELECT 1 FROM rma_lines l
-            JOIN dispositions d ON l.RMALineID = d.RMALineID
-            WHERE l.RMAID = r.RMAID AND d.Disposition IS NOT NULL
-        )"""
+    if disposition_status == "completed":
+        query += """
+            AND EXISTS (
+                SELECT 1 
+                FROM rma_lines l
+                JOIN dispositions d ON l.RMALineID = d.RMALineID
+                WHERE l.RMAID = r.RMAID
+                  AND d.Disposition IS NOT NULL
+            )
+        """
+    elif disposition_status == "pending":
+        query += """
+            AND EXISTS (
+                SELECT 1 
+                FROM rma_lines l
+                WHERE l.RMAID = r.RMAID
+            )
+            AND NOT EXISTS (
+                SELECT 1 
+                FROM rma_lines l
+                JOIN dispositions d ON l.RMALineID = d.RMALineID
+                WHERE l.RMAID = r.RMAID
+                  AND d.Disposition IS NOT NULL
+            )
+        """
     
-    # ------------- SEARCH -------------
+    # ---------- SEARCH ----------
     if search:
         search_text = f"%{search}%"
         exact_rma = search.strip()
 
-        # clause reused in WHERE and ORDER BY for line items
+        # Clause reused in WHERE and ORDER BY for line items
         line_clause = """
             EXISTS (
                 SELECT 1 FROM rma_lines l
                 WHERE l.RMAID = r.RMAID
                   AND (
-                      l.PartNumber      LIKE ?
-                      OR l.ToolNumber   LIKE ?
+                      l.PartNumber       LIKE ?
+                      OR l.ToolNumber    LIKE ?
                       OR l.ItemDescription LIKE ?
                   )
             )
@@ -826,29 +850,29 @@ owners = cur.fetchall()
             OR ('RMA' || printf('%04d', r.RMAID)) LIKE ?
             OR c.CustomerName LIKE ?
             OR r.CustomerComplaintDesc LIKE ?
-            OR o.OwnerName LIKE ?
+            OR o.FullName LIKE ?
             OR r.CreditMemoNumber LIKE ?
             OR {line_clause}
         )"""
 
-        # Params for WHERE:
+        # Params for WHERE
         params.extend([
             search_text,  # CAST(r.RMAID AS TEXT) LIKE ?
             search_text,  # 'RMA0001' style
             search_text,  # CustomerName
             search_text,  # Complaint
-            search_text,  # OwnerName
+            search_text,  # Owner (FullName)
             search_text,  # CreditMemoNumber
             search_text,  # PartNumber
             search_text,  # ToolNumber
             search_text   # ItemDescription
         ])
 
-        # ORDER BY: group "more relevant" matches higher
+        # ORDER BY: relevance + newest
         query += f"""
             ORDER BY
               CASE
-                -- exact formatted RMA match (if user literally typed "RMA0005")
+                -- exact formatted RMA match (if user typed "RMA0005")
                 WHEN ('RMA' || printf('%04d', r.RMAID)) = ? THEN 0
 
                 -- formatted RMA contains the search
@@ -867,7 +891,7 @@ owners = cur.fetchall()
                 WHEN r.CustomerComplaintDesc LIKE ? THEN 5
 
                 -- owner name
-                WHEN o.OwnerName LIKE ? THEN 6
+                WHEN o.FullName LIKE ? THEN 6
                 
                 -- credit memo number
                 WHEN r.CreditMemoNumber LIKE ? THEN 7
@@ -887,7 +911,7 @@ owners = cur.fetchall()
             search_text,  # line: ItemDescription
             search_text,  # CustomerName
             search_text,  # Complaint
-            search_text,  # OwnerName
+            search_text,  # OwnerName (FullName)
             search_text   # CreditMemoNumber
         ])
     else:
@@ -903,7 +927,7 @@ owners = cur.fetchall()
         rmas=rmas,
         customers=customers,
         owners=owners,
-        status_options=STATUS_OPTIONS,
+        status_options=STATUS_OPTIONS,  # assuming this constant exists globally
         current_status=status,
         current_return_type=return_type,
         current_search=search,
@@ -914,6 +938,7 @@ owners = cur.fetchall()
         current_credit_approved=credit_approved,
         current_disposition_status=disposition_status
     )
+
 
 
 # ============ VIEW RMA DETAIL ============
