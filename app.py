@@ -2594,6 +2594,7 @@ def edit_user(user_id):
 def inject_user():
     return dict(current_user=get_current_user())
 
+init_db_if_needed()
 
 if __name__ == "__main__":
     # Make sure the DB/tables exist before we start serving
