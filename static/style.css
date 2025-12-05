@@ -1,3 +1,24 @@
+/* Fix layout */
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.app-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+
+.app-header {
+  background: white;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  margin: 0 -20px 24px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gray-200);
+}
 /* ========== CSS VARIABLES ========== */
 :root {
   --primary: #2563eb;
