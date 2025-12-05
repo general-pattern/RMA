@@ -20,13 +20,6 @@ CREATE TABLE IF NOT EXISTS customers (
     ContactEmail    TEXT
 );
 
--- Internal Owners
-CREATE TABLE IF NOT EXISTS internal_owners (
-    OwnerID         INTEGER PRIMARY KEY AUTOINCREMENT,
-    OwnerName       TEXT NOT NULL,
-    OwnerEmail      TEXT NOT NULL
-);
-
 -- RMAs (header)
 CREATE TABLE IF NOT EXISTS rmas (
     RMAID                 INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +42,7 @@ CREATE TABLE IF NOT EXISTS rmas (
     CreditApprovedOn      TEXT,
     CreditApprovedBy      TEXT,
     FOREIGN KEY (CustomerID) REFERENCES customers(CustomerID),
-    FOREIGN KEY (InternalOwnerID) REFERENCES internal_owners(OwnerID),
+    FOREIGN KEY (InternalOwnerID) REFERENCES users(UserID),
     FOREIGN KEY (CreatedByUserID) REFERENCES users(UserID)
 );
 

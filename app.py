@@ -1001,8 +1001,16 @@ def view_rma(rma_id):
     cur.execute("SELECT * FROM customers ORDER BY CustomerName")
     customers = cur.fetchall()
     
-    cur.execute("SELECT * FROM internal_owners ORDER BY OwnerName")
-    owners = cur.fetchall()
+    cur.execute("""
+    SELECT UserID  AS OwnerID,
+           FullName AS OwnerName,
+           Email
+    FROM users
+    WHERE Role != 'admin' 
+    ORDER BY FullName
+""")
+owners = cur.fetchall()
+
     
     # Get all owners assigned to this RMA
     cur.execute("""
@@ -1044,8 +1052,16 @@ def new_rma():
     cur.execute("SELECT * FROM customers ORDER BY CustomerName")
     customers = cur.fetchall()
     
-    cur.execute("SELECT * FROM internal_owners ORDER BY OwnerName")
-    owners = cur.fetchall()
+    cur.execute("""
+    SELECT UserID  AS OwnerID,
+           FullName AS OwnerName,
+           Email
+    FROM users
+    WHERE Role != 'admin'          -- tweak as you like
+    ORDER BY FullName
+""")
+owners = cur.fetchall()
+
 
     if request.method == "POST":
         customer_id = request.form["customer_id"]
