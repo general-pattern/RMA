@@ -1,4 +1,3 @@
-
 /* ========== CSS VARIABLES ========== */
 :root {
   --primary: #2563eb;
@@ -22,22 +21,6 @@
   --shadow-lg: 0 4px 6px rgba(0,0,0,0.1);
 }
 
-/* ========== HEADER ========== */
-.app-header {
-  background: white;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--gray-200);
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-  gap: 16px;
-  position: relative;
-  z-index: 100;
-}
-
-
 /* ========== RESET & BASE ========== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -54,17 +37,14 @@ a:hover { text-decoration: underline; }
 
 /* ========== HEADER ========== */
 .app-header {
-  background: white;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--gray-200);
   margin-bottom: 24px;
   flex-wrap: wrap;
   gap: 16px;
-  position: relative;
-  z-index: 100;
 }
 .header-left { display: flex; align-items: center; gap: 12px; }
 .logo-link { text-decoration: none; }
@@ -72,12 +52,7 @@ a:hover { text-decoration: underline; }
 .app-subtitle { font-size: 12px; color: var(--gray-500); }
 
 /* ========== NAVIGATION ========== */
-.app-nav { 
-  display: flex; 
-  align-items: center; 
-  gap: 8px; 
-  flex-wrap: wrap;
-}
+.app-nav { display: flex; align-items: center; gap: 8px; }
 .nav-link {
   padding: 8px 14px;
   color: var(--gray-700);
@@ -389,119 +364,10 @@ textarea { resize: vertical; min-height: 80px; }
 
 /* ========== RESPONSIVE ========== */
 @media (max-width: 768px) {
-  .app-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .app-nav {
-    width: 100%;
-    justify-content: flex-start;
-  }
-}
+  .app-header { flex-direction: column; align-items: flex-start; }
+  .app-nav { width: 100%; flex-wrap: wrap; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .filter-grid { grid-template-columns: 1fr; }
   .status-form { flex-direction: column; align-items: stretch; }
   .status-form input { min-width: auto; }
-}
-
-/* Additional stat card styles for dashboard */
-.stat-draft { border-left-color: #6b7280; }
-.stat-urgent { border-left-color: #dc2626; }
-.stat-rejected { border-left-color: #6b7280; }
-
-/* ---------- RMA list: compact filter row ---------- */
-
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.page-header h2 {
-  margin: 0;
-  font-size: 1.35rem;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  background: var(--primary, #2563eb);
-  color: #fff;
-  border: none;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  background: #f3f4f6;
-  color: #111827;
-  border: 1px solid #e5e7eb;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-/* Filter card becomes a horizontal bar */
-.filter-card {
-  padding: 10px 14px;
-  margin-bottom: 16px;
-}
-
-.filter-form {
-  width: 100%;
-}
-
-.filter-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: flex-end;
-}
-
-/* Each single filter */
-.filter-group {
-  min-width: 150px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* Make the search box wider */
-.filter-group:first-child {
-  flex: 2 1 260px;
-}
-
-.filter-group input,
-.filter-group select {
-  height: 34px;
-  font-size: 0.9rem;
-}
-
-/* Push the Search/Clear buttons to the far right */
-.filter-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* On smaller screens, let it wrap nicely */
-@media (max-width: 900px) {
-  .filter-actions {
-    width: 100%;
-    justify-content: flex-start;
-    margin-left: 0;
-    margin-top: 4px;
-  }
 }
