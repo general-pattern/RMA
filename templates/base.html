@@ -36,21 +36,25 @@
         
         <a href="{{ url_for('metrics') }}" class="nav-link">📊 Metrics</a>
         
-        <!-- Admin Dropdown -->
+        <!-- Admin Dropdown - Only for admins -->
+        {% if current_user and current_user['Role'] == 'admin' %}
         <div class="nav-dropdown">
           <button class="nav-dropdown-btn">Admin <span class="dropdown-arrow">▼</span></button>
           <div class="nav-dropdown-content">
-            {% if current_user and current_user['Role'] == 'admin' %}
             <a href="{{ url_for('admin_users') }}">👥 Manage Users</a>
             <a href="{{ url_for('register') }}">➕ Add User</a>
             <div style="border-top: 1px solid var(--gray-200); margin: 5px 0;"></div>
-            {% endif %}
             <a href="{{ url_for('list_customers') }}">🏢 Customers</a>
             <a href="{{ url_for('list_owners') }}">👤 Internal Owners</a>
           </div>
         </div>
-        
-        <!-- User Menu -->
+        {% else %}
+        <!-- Regular users see direct links -->
+        <a href="{{ url_for('list_customers') }}" class="nav-link">🏢 Customers</a>
+        <a href="{{ url_for('list_owners') }}" class="nav-link">👤 Owners</a>
+        {% endif %}
+       
+        <!-- User Menu / Auth Links -->
         {% if current_user %}
         <div class="nav-dropdown user-menu">
           <button class="nav-dropdown-btn user-btn">
@@ -64,11 +68,17 @@
             <a href="{{ url_for('logout') }}" class="logout-link">🚪 Logout</a>
           </div>
         </div>
+        {% elif session.get('user_id') %}
+          {# Fallback: session says logged in, but current_user is None #}
+          <a href="{{ url_for('logout') }}" class="nav-link">🚪 Logout</a>
+        {% else %}
+          {# Not logged in at all #}
+          <a href="{{ url_for('login') }}" class="nav-link">🔐 Login</a>
         {% endif %}
       </nav>
-    </header>
+    </header>  <!-- 🔹 THIS WAS MISSING -->
 
-            <!-- Flash Messages -->
+    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="flash-container">
@@ -102,9 +112,7 @@
       {% endif %}
     {% endwith %}
 
-
-
-    <main>
+    <main class="app-content">
       {% block content %}{% endblock %}
     </main>
     
@@ -114,3 +122,4 @@
   </div>
 </body>
 </html>
+
