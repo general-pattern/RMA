@@ -646,9 +646,9 @@ cur.execute(f"""
     GROUP BY o.UserID
     ORDER BY active DESC, total DESC
 """)
-owner_workload = cur.fetchall()
+    owner_workload = cur.fetchall()
     
-    # Disposition breakdown
+    # Disposition breakdown     # ← CORRECT: same level as owner_workload
     cur.execute(f"""
         SELECT d.Disposition, COUNT(*) as count
         FROM dispositions d
