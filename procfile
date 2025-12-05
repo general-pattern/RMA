@@ -1,0 +1,6 @@
+# In your RMA_app folder
+notepad Procfile
+```
+Paste this:
+```
+web: bash startup.sh

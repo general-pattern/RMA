@@ -3,40 +3,46 @@
 *.sqlite
 *.accdb
 *.mdb
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
 
-# Env / secrets
+# Environment variables
 .env
 *.env
+!.env.example
 
-# Uploads or temp
+# Uploads and temp files
 uploads/
 tmp/
-
-# Python / env
-__pycache__/
-*.pyc
-venv/
-
-# Databases (don't commit actual DB files)
-*.db
-*.sqlite
-*.accdb
-*.mdb
+*.log
 
 # Backups
 *.backup
+backup_*/
 
-# Build / dist artifacts
-build/
-dist/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
 *.spec
-
-# Logs & temp
-*.log
-tmp/
-uploads/
