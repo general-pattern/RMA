@@ -303,9 +303,10 @@ def login():
             return render_template("login.html")
 
         # success → set session
-        session["user_id"] = user["UserID"]
-        session["username"] = user["Username"]
-        session["role"] = user["Role"]
+	session["user_id"] = user["UserID"]
+	session["username"] = user["Username"]
+	session["role"] = user["Role"]
+	session["full_name"] = user["FullName"]  # ADD THIS LINE
 
         # optional: update LastLogin
         conn = sqlite3.connect(DB_PATH)
