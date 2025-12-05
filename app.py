@@ -196,9 +196,9 @@ def get_db():
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('Please log in to access this page.', 'warning')
-            return redirect(url_for('login'))
+        if "user_id" not in session:
+            flash("Please log in to access this page.", "error")
+            return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -282,35 +282,46 @@ def send_rma_notification(owner_email, owner_name, rma_id, rma_code, customer_na
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if 'user_id' in session:
-        return redirect(url_for('index'))
-    
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        
-        conn = get_db()
+
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE Username = ?", (username,))
         user = cur.fetchone()
-        
-        if user and check_password_hash(user['PasswordHash'], password):
-            session['user_id'] = user['UserID']
-            session['username'] = user['Username']
-            session['full_name'] = user['FullName']
-            
-            cur.execute("UPDATE users SET LastLogin = ? WHERE UserID = ?",
-                       (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), user['UserID']))
-            conn.commit()
-            conn.close()
-            
-            flash(f'Welcome back, {user["FullName"]}!', 'success')
-            return redirect(url_for('index'))
-        
         conn.close()
-        flash('Invalid username or password.', 'error')
-    
+
+        if user is None:
+            flash("Invalid username or password.", "error")
+            return render_template("login.html")
+
+        # user["PasswordHash"] exists per your schema
+        if not check_password_hash(user["PasswordHash"], password):
+            flash("Invalid username or password.", "error")
+            return render_template("login.html")
+
+        # success → set session
+        session["user_id"] = user["UserID"]
+        session["username"] = user["Username"]
+        session["role"] = user["Role"]
+
+        # optional: update LastLogin
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE users SET LastLogin = ? WHERE UserID = ?",
+            (datetime.utcnow().isoformat(timespec="seconds"), user["UserID"])
+        )
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for("dashboard"))  # or whatever your main page is
+
+    # GET
     return render_template("login.html")
+
 
 
 @app.route("/register", methods=["GET", "POST"])
