@@ -728,8 +728,16 @@ def list_rmas():
     cur.execute("SELECT * FROM customers ORDER BY CustomerName")
     customers = cur.fetchall()
     
-    cur.execute("SELECT * FROM internal_owners ORDER BY OwnerName")
-    owners = cur.fetchall()
+    cur.execute("""
+    SELECT UserID AS OwnerID,
+           FullName AS OwnerName,
+           Email
+    FROM users
+    WHERE Role != 'admin'          -- or whatever filter you want
+    ORDER BY FullName
+""")
+owners = cur.fetchall()
+
 
     # Base query - now includes disposition check
     query = """
