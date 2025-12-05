@@ -93,7 +93,7 @@ def init_db_if_needed():
         full_name = "Admin User"
         email = "admin@example.com"
         role = "admin"
-        created_on = datetime.now().isoformat(timespec="seconds")
+        created_on = datetime.utcnow().isoformat(timespec="seconds")
         last_login = None  # or created_on if you prefer
 
         cur.execute(
@@ -313,7 +313,7 @@ def login():
         cur = conn.cursor()
         cur.execute(
             "UPDATE users SET LastLogin = ? WHERE UserID = ?",
-            (datetime.now().isoformat(timespec="seconds"), user["UserID"])
+            (datetime.utcnow().isoformat(timespec="seconds"), user["UserID"])
         )
         conn.commit()
         conn.close()
@@ -322,6 +322,7 @@ def login():
 
     # GET
     return render_template("login.html")
+
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -335,8 +336,7 @@ def register():
         confirm_password = request.form.get("confirm_password", "")
         full_name = request.form.get("full_name", "").strip()
         email = request.form.get("email", "").strip()
-        role = request.form.get("role", "user")
-        is_owner = 1 if request.form.get("is_owner") else 0  # Get role from form
+        role = request.form.get("role", "user")  # Get role from form
         
         if not all([username, password, full_name, email]):
             flash('All fields are required.', 'error')
@@ -373,9 +373,9 @@ def register():
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         cur.execute("""
-            INSERT INTO users (Username, PasswordHash, FullName, Email, Role, IsOwner, CreatedOn)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (username, password_hash, full_name, email, role, is_owner, now))
+            INSERT INTO users (Username, PasswordHash, FullName, Email, Role, CreatedOn)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (username, password_hash, full_name, email, role, now))
         
         conn.commit()
         conn.close()
@@ -465,10 +465,10 @@ def index():
     
     # Recent RMAs
     cur.execute("""
-        SELECT r.*, c.CustomerName, o.FullName, u.FullName as CreatedByName
+        SELECT r.*, c.CustomerName, o.OwnerName, u.FullName as CreatedByName
         FROM rmas r
         JOIN customers c ON r.CustomerID = c.CustomerID
-        LEFT JOIN users o ON r.AssignedToUserID = o.UserID
+        LEFT JOIN internal_owners o ON r.InternalOwnerID = o.OwnerID
         LEFT JOIN users u ON r.CreatedByUserID = u.UserID
         ORDER BY r.DateOpened DESC
         LIMIT 5
@@ -483,22 +483,22 @@ def index():
     
     if user:
         cur.execute("""
-    SELECT UserID FROM users 
-    WHERE IsOwner = 1 AND Email = ?
-""", (user['Email'],))
+            SELECT OwnerID FROM internal_owners
+            WHERE OwnerEmail = ?
+        """, (user['Email'],))
         
         owner_row = cur.fetchone()
         
         if owner_row:
             is_owner = True
-            owner_id = owner_row['UserID']
+            owner_id = owner_row['OwnerID']
             
             # Get count of assigned RMAs
             cur.execute("""
                 SELECT COUNT(DISTINCT r.RMAID)
                 FROM rmas r
                 JOIN rma_owners ro ON r.RMAID = ro.RMAID
-                WHERE ro.UserID = ?
+                WHERE ro.OwnerID = ?
                   AND r.Status NOT IN ('Closed', 'Rejected')
             """, (owner_id,))
             my_rmas_count = cur.fetchone()[0]
@@ -508,7 +508,7 @@ def index():
                 SELECT COUNT(DISTINCT r.RMAID)
                 FROM rmas r
                 JOIN rma_owners ro ON r.RMAID = ro.RMAID
-                WHERE ro.UserID = ?
+                WHERE ro.OwnerID = ?
                   AND r.Status NOT IN ('Closed', 'Rejected')
                   AND DATE(r.DateOpened) <= DATE('now', '-14 days')
             """, (owner_id,))
@@ -637,12 +637,12 @@ def metrics():
     
     # Owner workload
     cur.execute(f"""
-        SELECT o.FullName, 
+        SELECT o.OwnerName, 
                COUNT(r.RMAID) as total,
                SUM(CASE WHEN r.Status NOT IN ('Closed', 'Rejected') THEN 1 ELSE 0 END) as active
-        FROM users WHERE IsOwner = 1 o
-        LEFT JOIN rmas r ON o.UserID = r.AssignedToUserID AND (1=1 {date_filter.replace('r.DateOpened', 'DateOpened') if date_filter else ''})
-        GROUP BY o.UserID
+        FROM internal_owners o
+        LEFT JOIN rmas r ON o.OwnerID = r.InternalOwnerID AND (1=1 {date_filter.replace('r.DateOpened', 'DateOpened') if date_filter else ''})
+        GROUP BY o.OwnerID
         ORDER BY active DESC, total DESC
     """)
     owner_workload = cur.fetchall()
@@ -735,7 +735,7 @@ def list_rmas():
             FullName AS OwnerName,
             Email
         FROM users
-        WHERE IsOwner = 1
+        WHERE Role != 'admin'
         ORDER BY FullName
     """)
     owners = cur.fetchall()
@@ -762,7 +762,7 @@ def list_rmas():
         JOIN customers c
             ON r.CustomerID = c.CustomerID
         LEFT JOIN users o
-            ON r.AssignedToUserID = o.UserID
+            ON r.InternalOwnerID = o.UserID
         LEFT JOIN users u
             ON r.CreatedByUserID = u.UserID
         WHERE 1 = 1
@@ -783,7 +783,7 @@ def list_rmas():
         params.append(customer_id)
     
     if owner_id:
-        query += " AND r.AssignedToUserID = ?"
+        query += " AND r.InternalOwnerID = ?"
         params.append(owner_id)
     
     if date_from:
@@ -940,6 +940,7 @@ def list_rmas():
     )
 
 
+
 # ============ VIEW RMA DETAIL ============
 
 @app.route("/rmas/<int:rma_id>")
@@ -953,10 +954,10 @@ def view_rma(rma_id):
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT r.*, c.CustomerName, o.FullName, o.Email, u.FullName as CreatedByName
+        SELECT r.*, c.CustomerName, o.OwnerName, o.OwnerEmail, u.FullName as CreatedByName
         FROM rmas r
         JOIN customers c ON r.CustomerID = c.CustomerID
-        LEFT JOIN users o ON r.AssignedToUserID = o.UserID
+        LEFT JOIN internal_owners o ON r.InternalOwnerID = o.OwnerID
         LEFT JOIN users u ON r.CreatedByUserID = u.UserID
         WHERE r.RMAID = ?
     """, (rma_id,))
@@ -1001,24 +1002,23 @@ def view_rma(rma_id):
     customers = cur.fetchall()
     
     cur.execute("""
-        SELECT UserID  AS OwnerID,
-               FullName AS OwnerName,
-               Email
-        FROM users
-        WHERE IsOwner = 1
-        ORDER BY FullName
-    """)
-    owners = cur.fetchall()
-
+    SELECT UserID  AS OwnerID,
+           FullName AS OwnerName,
+           Email
+    FROM users
+    WHERE Role != 'admin' 
+    ORDER BY FullName
+""")
+owners = cur.fetchall()
 
     
     # Get all owners assigned to this RMA
     cur.execute("""
-        SELECT ro.*, o.FullName, o.Email
+        SELECT ro.*, o.OwnerName, o.OwnerEmail
         FROM rma_owners ro
-        JOIN users o ON ro.UserID = o.UserID
+        JOIN internal_owners o ON ro.OwnerID = o.OwnerID
         WHERE ro.RMAID = ?
-        ORDER BY ro.IsPrimary DESC, o.FullName
+        ORDER BY ro.IsPrimary DESC, o.OwnerName
     """, (rma_id,))
     assigned_owners = cur.fetchall()
 
@@ -1053,14 +1053,14 @@ def new_rma():
     customers = cur.fetchall()
     
     cur.execute("""
-        SELECT UserID  AS OwnerID,
-               FullName AS OwnerName,
-               Email
-        FROM users
-        WHERE IsOwner = 1
-        ORDER BY FullName
-    """)
-    owners = cur.fetchall()
+    SELECT UserID  AS OwnerID,
+           FullName AS OwnerName,
+           Email
+    FROM users
+    WHERE Role != 'admin'          -- tweak as you like
+    ORDER BY FullName
+""")
+owners = cur.fetchall()
 
 
     if request.method == "POST":
@@ -1076,7 +1076,7 @@ def new_rma():
         cur.execute("""
             INSERT INTO rmas
             (CustomerID, CreatedByUserID, DateOpened, Status, ReturnType, 
-             AssignedToUserID, CustomerComplaintDesc, InternalNotes, NotesLastModified, NotesModifiedBy)
+             InternalOwnerID, CustomerComplaintDesc, InternalNotes, NotesLastModified, NotesModifiedBy)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             customer_id, session['user_id'], date_opened, status, return_type, 
@@ -1090,7 +1090,7 @@ def new_rma():
         # Add owner to rma_owners table if specified
         if owner_id:
             cur.execute("""
-                INSERT INTO rma_owners (RMAID, UserID, IsPrimary, AssignedOn, AssignedBy)
+                INSERT INTO rma_owners (RMAID, OwnerID, IsPrimary, AssignedOn, AssignedBy)
                 VALUES (?, ?, 1, ?, ?)
             """, (rma_id, owner_id, date_opened, session['user_id']))
 
@@ -1109,14 +1109,14 @@ def new_rma():
         conn.commit()
         
         if owner_id:
-            cur.execute("SELECT OwnerName, OwnerEmail FROM internal_owners WHERE UserID = ?", (owner_id,))
+            cur.execute("SELECT OwnerName, OwnerEmail FROM internal_owners WHERE OwnerID = ?", (owner_id,))
             owner = cur.fetchone()
             if owner:
                 cur.execute("SELECT CustomerName FROM customers WHERE CustomerID = ?", (customer_id,))
                 customer = cur.fetchone()
                 rma_code = f"RMA{rma_id:04d}"
                 send_rma_notification(
-                    owner['Email'], owner['FullName'], rma_id, rma_code,
+                    owner['OwnerEmail'], owner['OwnerName'], rma_id, rma_code,
                     customer['CustomerName'], return_type, complaint, session['full_name']
                 )
         
@@ -1161,7 +1161,7 @@ def edit_rma_inline(rma_id):
             "CustomerID": before["CustomerID"],
             "Status": before["Status"],
             "ReturnType": before["ReturnType"],
-            "AssignedToUserID": before["AssignedToUserID"],
+            "InternalOwnerID": before["InternalOwnerID"],
             "CustomerComplaintDesc": before["CustomerComplaintDesc"],
             "InternalNotes": before["InternalNotes"],
             "CreditMemoNumber": before["CreditMemoNumber"],
@@ -1182,7 +1182,7 @@ def edit_rma_inline(rma_id):
         SET CustomerID = ?,
             Status = ?,
             ReturnType = ?,
-            AssignedToUserID = ?,
+            InternalOwnerID = ?,
             CustomerComplaintDesc = ?,
             InternalNotes = ?,
             CreditMemoNumber = ?,
@@ -1314,6 +1314,7 @@ def update_status(rma_id):
     return redirect(url_for("view_rma", rma_id=rma_id))
 
 
+
 # ============ DELETE STATUS HISTORY ENTRY ============
 
 @app.route("/rmas/<int:rma_id>/status_history/<int:history_id>/delete", methods=["POST"])
@@ -1368,6 +1369,7 @@ def delete_status_history_entry(rma_id, history_id):
     conn.close()
 
     return redirect(url_for("view_rma", rma_id=rma_id))
+
 
 
 # ============ ACKNOWLEDGE RMA ============
@@ -1590,7 +1592,7 @@ def undo_last():
                 SET CustomerID = ?,
                     Status = ?,
                     ReturnType = ?,
-                    AssignedToUserID = ?,
+                    InternalOwnerID = ?,
                     CustomerComplaintDesc = ?,
                     InternalNotes = ?,
                     CreditMemoNumber = ?,
@@ -1601,7 +1603,7 @@ def undo_last():
                 data["CustomerID"],
                 data["Status"],
                 data["ReturnType"],
-                data["AssignedToUserID"],
+                data["InternalOwnerID"],
                 data["CustomerComplaintDesc"],
                 data["InternalNotes"],
                 data.get("CreditMemoNumber"),
@@ -1936,6 +1938,7 @@ def delete_attachment(rma_id, attachment_id):
     return redirect(url_for("view_rma", rma_id=rma_id))
 
 
+
 # ============ CUSTOMERS ============
 
 @app.route("/customers")
@@ -2044,10 +2047,10 @@ def list_owners():
                COUNT(r.RMAID) as rma_count,
                SUM(CASE WHEN r.Status != 'Closed' THEN 1 ELSE 0 END) as open_count,
                SUM(CASE WHEN r.Status = 'Draft' THEN 1 ELSE 0 END) as pending_count
-        FROM users WHERE IsOwner = 1 o
-        LEFT JOIN rmas r ON o.UserID = r.AssignedToUserID
-        GROUP BY o.UserID
-        ORDER BY o.FullName
+        FROM internal_owners o
+        LEFT JOIN rmas r ON o.OwnerID = r.InternalOwnerID
+        GROUP BY o.OwnerID
+        ORDER BY o.OwnerName
     """)
     owners = cur.fetchall()
     conn.close()
@@ -2087,7 +2090,7 @@ def edit_owner(owner_id):
         name = request.form.get("owner_name", "").strip()
         email = request.form.get("owner_email", "").strip()
         
-        cur.execute("UPDATE internal_owners SET OwnerName = ?, OwnerEmail = ? WHERE UserID = ?",
+        cur.execute("UPDATE internal_owners SET OwnerName = ?, OwnerEmail = ? WHERE OwnerID = ?",
                    (name, email, owner_id))
         conn.commit()
         conn.close()
@@ -2095,7 +2098,7 @@ def edit_owner(owner_id):
         flash('Owner updated.', 'success')
         return redirect(url_for("list_owners"))
     
-    cur.execute("SELECT * FROM internal_owners WHERE UserID = ?", (owner_id,))
+    cur.execute("SELECT * FROM internal_owners WHERE OwnerID = ?", (owner_id,))
     owner = cur.fetchone()
     conn.close()
     
@@ -2112,13 +2115,13 @@ def delete_owner(owner_id):
     conn = get_db()
     cur = conn.cursor()
     
-    cur.execute("SELECT COUNT(*) FROM rmas WHERE AssignedToUserID = ?", (owner_id,))
+    cur.execute("SELECT COUNT(*) FROM rmas WHERE InternalOwnerID = ?", (owner_id,))
     if cur.fetchone()[0] > 0:
         conn.close()
         flash('Cannot delete owner with existing RMAs.', 'error')
         return redirect(url_for("list_owners"))
     
-    cur.execute("DELETE FROM internal_owners WHERE UserID = ?", (owner_id,))
+    cur.execute("DELETE FROM internal_owners WHERE OwnerID = ?", (owner_id,))
     conn.commit()
     conn.close()
     
@@ -2144,7 +2147,7 @@ def add_rma_owner(rma_id):
     # Check if already assigned
     cur.execute("""
         SELECT COUNT(*) FROM rma_owners
-        WHERE RMAID = ? AND UserID = ?
+        WHERE RMAID = ? AND OwnerID = ?
     """, (rma_id, owner_id))
     
     if cur.fetchone()[0] > 0:
@@ -2155,7 +2158,7 @@ def add_rma_owner(rma_id):
     # Add owner
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cur.execute("""
-        INSERT INTO rma_owners (RMAID, UserID, IsPrimary, AssignedOn, AssignedBy)
+        INSERT INTO rma_owners (RMAID, OwnerID, IsPrimary, AssignedOn, AssignedBy)
         VALUES (?, ?, 0, ?, ?)
     """, (rma_id, owner_id, now, session.get('user_id')))
     
@@ -2176,7 +2179,7 @@ def remove_rma_owner(rma_id, owner_id):
     # Check if this is the primary owner
     cur.execute("""
         SELECT IsPrimary FROM rma_owners
-        WHERE RMAID = ? AND UserID = ?
+        WHERE RMAID = ? AND OwnerID = ?
     """, (rma_id, owner_id))
     
     row = cur.fetchone()
@@ -2193,7 +2196,7 @@ def remove_rma_owner(rma_id, owner_id):
     # Remove owner
     cur.execute("""
         DELETE FROM rma_owners
-        WHERE RMAID = ? AND UserID = ?
+        WHERE RMAID = ? AND OwnerID = ?
     """, (rma_id, owner_id))
     
     conn.commit()
@@ -2219,7 +2222,7 @@ def change_primary_owner(rma_id):
     # Check if new primary is already an owner
     cur.execute("""
         SELECT COUNT(*) FROM rma_owners
-        WHERE RMAID = ? AND UserID = ?
+        WHERE RMAID = ? AND OwnerID = ?
     """, (rma_id, new_primary_id))
     
     is_already_owner = cur.fetchone()[0] > 0
@@ -2236,20 +2239,20 @@ def change_primary_owner(rma_id):
         cur.execute("""
             UPDATE rma_owners
             SET IsPrimary = 1
-            WHERE RMAID = ? AND UserID = ?
+            WHERE RMAID = ? AND OwnerID = ?
         """, (rma_id, new_primary_id))
     else:
         # Add new owner as primary
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cur.execute("""
-            INSERT INTO rma_owners (RMAID, UserID, IsPrimary, AssignedOn, AssignedBy)
+            INSERT INTO rma_owners (RMAID, OwnerID, IsPrimary, AssignedOn, AssignedBy)
             VALUES (?, ?, 1, ?, ?)
         """, (rma_id, new_primary_id, now, session.get('user_id')))
     
-    # Update legacy AssignedToUserID field for compatibility
+    # Update legacy InternalOwnerID field for compatibility
     cur.execute("""
         UPDATE rmas
-        SET AssignedToUserID = ?
+        SET InternalOwnerID = ?
         WHERE RMAID = ?
     """, (new_primary_id, rma_id))
     
@@ -2273,8 +2276,8 @@ def dashboard():
     
     # Get user's owner record (if they are an owner)
     cur.execute("""
-        SELECT UserID FROM users
-        WHERE IsOwner = 1 AND Email = ?
+        SELECT OwnerID FROM internal_owners
+        WHERE OwnerEmail = ?
     """, (user['Email'],))
     
     owner_row = cur.fetchone()
@@ -2287,7 +2290,7 @@ def dashboard():
                              my_rmas=[],
                              stats={})
     
-    owner_id = owner_row['UserID']
+    owner_id = owner_row['OwnerID']
     
     # Get all RMAs assigned to this owner
     cur.execute("""
@@ -2296,7 +2299,7 @@ def dashboard():
         FROM rmas r
         JOIN rma_owners ro ON r.RMAID = ro.RMAID
         JOIN customers c ON r.CustomerID = c.CustomerID
-        WHERE ro.UserID = ?
+        WHERE ro.OwnerID = ?
           AND r.Status NOT IN ('Closed', 'Rejected')
         ORDER BY r.DateOpened ASC
     """, (owner_id,))
@@ -2351,8 +2354,8 @@ def notification_preferences():
     
     # Get user's owner record
     cur.execute("""
-        SELECT UserID FROM users
-        WHERE IsOwner = 1 AND Email = ?
+        SELECT OwnerID FROM internal_owners
+        WHERE OwnerEmail = ?
     """, (user['Email'],))
     
     owner_row = cur.fetchone()
@@ -2361,12 +2364,12 @@ def notification_preferences():
     
     if owner_row:
         is_owner = True
-        owner_id = owner_row['UserID']
+        owner_id = owner_row['OwnerID']
         
         # Get current preferences
         cur.execute("""
             SELECT * FROM owner_notification_preferences
-            WHERE UserID = ?
+            WHERE OwnerID = ?
         """, (owner_id,))
         
         prefs = cur.fetchone()
@@ -2375,14 +2378,14 @@ def notification_preferences():
         if not prefs:
             cur.execute("""
                 INSERT INTO owner_notification_preferences 
-                (UserID, EmailEnabled, Frequency, RMAAge)
+                (OwnerID, EmailEnabled, Frequency, RMAAge)
                 VALUES (?, 1, 'daily', 3)
             """, (owner_id,))
             conn.commit()
             
             cur.execute("""
                 SELECT * FROM owner_notification_preferences
-                WHERE UserID = ?
+                WHERE OwnerID = ?
             """, (owner_id,))
             prefs = cur.fetchone()
     
@@ -2404,8 +2407,8 @@ def save_notification_preferences():
     
     # Get user's owner record
     cur.execute("""
-        SELECT UserID FROM users
-        WHERE IsOwner = 1 AND Email = ?
+        SELECT OwnerID FROM internal_owners
+        WHERE OwnerEmail = ?
     """, (user['Email'],))
     
     owner_row = cur.fetchone()
@@ -2415,7 +2418,7 @@ def save_notification_preferences():
         flash('You must be an internal owner to configure notifications.', 'error')
         return redirect(url_for('profile'))
     
-    owner_id = owner_row['UserID']
+    owner_id = owner_row['OwnerID']
     
     # Get form data
     email_enabled = 1 if request.form.get('email_enabled') == 'on' else 0
@@ -2439,7 +2442,7 @@ def save_notification_preferences():
         SET EmailEnabled = ?,
             Frequency = ?,
             RMAAge = ?
-        WHERE UserID = ?
+        WHERE OwnerID = ?
     """, (email_enabled, frequency, rma_age, owner_id))
     
     conn.commit()
@@ -2647,5 +2650,7 @@ if __name__ == "__main__":
     # Make sure the DB/tables exist before we start serving
     init_db_if_needed()
     app.run(host="0.0.0.0", port=10000, debug=False)
+
+
 
 

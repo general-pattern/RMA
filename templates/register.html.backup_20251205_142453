@@ -44,14 +44,6 @@
       <small>Admins can manage users and have full system access</small>
     </div>
     
-    <div class="form-group">
-      <label style="display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" name="is_owner" style="width: auto; margin-right: 10px;">
-        <span>Can be assigned RMAs (Owner)</span>
-      </label>
-      <small>Check this if the user should be able to own/handle RMAs</small>
-    </div>
-    
     <div style="margin-top: 30px; display: flex; gap: 10px;">
       <button type="submit" class="btn-primary">✓ Create User</button>
       <a href="{{ url_for('admin_users') }}" class="btn-secondary">Cancel</a>

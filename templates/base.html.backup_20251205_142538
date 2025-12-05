@@ -37,20 +37,22 @@
         <a href="{{ url_for('metrics') }}" class="nav-link">📊 Metrics</a>
         
         <!-- Admin Dropdown - Only for admins -->
-{% if current_user and current_user['Role'] == 'admin' %}
-<div class="nav-dropdown">
-  <button class="nav-dropdown-btn">Admin <span class="dropdown-arrow">▼</span></button>
-  <div class="nav-dropdown-content">
-    <a href="{{ url_for('admin_users') }}">👥 Manage Users</a>
-    <a href="{{ url_for('register') }}">➕ Add User</a>
-    <div style="border-top: 1px solid var(--gray-200); margin: 5px 0;"></div>
-    <a href="{{ url_for('list_customers') }}">🏢 Customers</a>
-  </div>
-</div>
-{% else %}
-<!-- Regular users see direct links -->
-<a href="{{ url_for('list_customers') }}" class="nav-link">🏢 Customers</a>
-{% endif %}
+        {% if current_user and current_user['Role'] == 'admin' %}
+        <div class="nav-dropdown">
+          <button class="nav-dropdown-btn">Admin <span class="dropdown-arrow">▼</span></button>
+          <div class="nav-dropdown-content">
+            <a href="{{ url_for('admin_users') }}">👥 Manage Users</a>
+            <a href="{{ url_for('register') }}">➕ Add User</a>
+            <div style="border-top: 1px solid var(--gray-200); margin: 5px 0;"></div>
+            <a href="{{ url_for('list_customers') }}">🏢 Customers</a>
+            <a href="{{ url_for('admin_users') }}">👤 Users</a>
+          </div>
+        </div>
+        {% else %}
+        <!-- Regular users see direct links -->
+        <a href="{{ url_for('list_customers') }}" class="nav-link">🏢 Customers</a>
+        <a href="{{ url_for('admin_users') }}" class="nav-link">👥 Users</a>
+        {% endif %}
        
         <!-- User Menu / Auth Links -->
         {% if current_user %}

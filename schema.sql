@@ -12,6 +12,19 @@ CREATE TABLE IF NOT EXISTS users (
     LastLogin       TEXT
 );
 
+-- Users (for authentication and ownership)
+CREATE TABLE IF NOT EXISTS users (
+    UserID          INTEGER PRIMARY KEY AUTOINCREMENT,
+    Username        TEXT NOT NULL UNIQUE,
+    PasswordHash    TEXT NOT NULL,
+    FullName        TEXT NOT NULL,
+    Email           TEXT NOT NULL UNIQUE,
+    Role            TEXT DEFAULT 'user',
+    IsOwner         INTEGER DEFAULT 0,
+    CreatedOn       TEXT NOT NULL,
+    LastLogin       TEXT
+);
+
 -- Customers
 CREATE TABLE IF NOT EXISTS customers (
     CustomerID      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +55,7 @@ CREATE TABLE IF NOT EXISTS rmas (
     CreditApprovedOn      TEXT,
     CreditApprovedBy      TEXT,
     FOREIGN KEY (CustomerID) REFERENCES customers(CustomerID),
-    FOREIGN KEY (InternalOwnerID) REFERENCES users(UserID),
+    FOREIGN KEY (InternalOwnerID) REFERENCES internal_owners(OwnerID),
     FOREIGN KEY (CreatedByUserID) REFERENCES users(UserID)
 );
 
